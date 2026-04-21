@@ -217,7 +217,7 @@ const Index = () => {
                         Change Log
                       </Nav.Link>
                     </li>
-                    <Nav.Item as="li" className="me-3">
+                    {/* <Nav.Item as="li" className="me-3">
                         <Link className="btn btn-secondary d-flex align-items-center" aria-current="page" to="/landing-modules/home" target="_blank">
                               Landing pages 
                         </Link>
@@ -239,7 +239,7 @@ const Index = () => {
                             </svg>
                             Download
                         </Link>
-                    </Nav.Item>
+                    </Nav.Item> */}
                   </ul>
                 </Navbar.Collapse>
               </Container>

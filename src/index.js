@@ -15,11 +15,18 @@ import { IndexRouters } from "./router";
 import {LandingModulesRouter} from './router/landing-modules-router'
 import { SimpleRouter } from "./router/simple-router";
 import { DefaultRouter } from "./router/default-router";
+import SignIn from "./views/dashboard/auth/sign-in";
+import PublicRoute from "./router/public-route";
+
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Index />,
+    element: (
+      <PublicRoute>
+        <SignIn />
+      </PublicRoute>
+    ),
   },
   ...DefaultRouter,
   ...IndexRouters,

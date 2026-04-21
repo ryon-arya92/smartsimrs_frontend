@@ -20,7 +20,7 @@ const Horizontal = memo((props) => {
  
     return (
         <Fragment>
-            <main className="main-content">
+            {/* <main className="main-content">
                 <HeaderStyle1 />
                 <div className="conatiner-fluid content-inner">
                    <HorizontalRouter />
@@ -38,7 +38,7 @@ const Horizontal = memo((props) => {
             <SettingOffCanvas/>
             <Link className="btn btn-fixed-end btn-secondary btn-icon btn-dashboard" to="/landing-modules/home" target="_blank" >
                  Landing Pages
-            </Link>
+            </Link> */}
         </Fragment>
     )
 })

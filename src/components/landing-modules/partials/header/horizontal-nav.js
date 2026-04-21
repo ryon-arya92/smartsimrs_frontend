@@ -16,7 +16,7 @@ const HorizontalNav = memo(() => {
       <Navbar.Brand className="ms-3">
         <Logo color="true"/>
          {/* {{> partials/components/logo color="true"}} */}
-         <h5 className="logo-title">Hope Ui</h5>
+         <h5 className="logo-title">SmartSimrs</h5>
       </Navbar.Brand>
       <button className="btn-close float-end px-3"></button>
    </Offcanvas.Header>
