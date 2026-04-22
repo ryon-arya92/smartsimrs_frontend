@@ -1,5 +1,5 @@
 import React from "react";
-import { Row, Col, Table, Badge, Button } from "react-bootstrap";
+import { Row, Col, Table, Badge, Button, OverlayTrigger, Tooltip } from "react-bootstrap";
 import Card from "../../components/Card";
 
 const RincianBilling = ({
@@ -9,6 +9,9 @@ const RincianBilling = ({
   onKirimRanap,
   calculateTotal,
   getPelaksanaDefault,
+  onAddTindakan, // Prop baru untuk handle tambah data
+  onEditTindakan, // Prop baru untuk handle edit per item
+  onDeleteTindakan, // Prop baru untuk handle hapus per item
 }) => {
   if (!selectedTransaksi) return null;
 
@@ -21,7 +24,6 @@ const RincianBilling = ({
               <h4 className="card-title text-primary mb-0">
                 Rincian Billing: {selectedTransaksi.nama}
               </h4>
-              {/* Notifikasi jika sudah kirim ranap */}
               {selectedTransaksi.items[0]?.kirim_ranap === 1 && (
                 <div className="mt-2">
                   <Badge
@@ -32,8 +34,7 @@ const RincianBilling = ({
                     <i className="fas fa-info-circle me-2"></i>
                     <span>
                       <Badge bg="warning" className="text-dark ms-1">
-                        Tindakan Sudah Terkirim Ke Register Rawat Inap Dengan No
-                        Register: {selectedTransaksi.items[0]?.register_ranap}
+                        Tindakan Sudah Terkirim Ke Register Rawat Inap: {selectedTransaksi.items[0]?.register_ranap}
                       </Badge>
                     </span>
                   </Badge>
@@ -41,8 +42,17 @@ const RincianBilling = ({
               )}
             </div>
 
-            <div className="d-flex gap-2">
-              {/* Button SmartRemun - Sekarang otomatis Disable jika sudah kirim ranap */}
+            <div className="d-flex gap-2 align-items-center">
+              {/* BUTTON TAMBAH TINDAKAN */}
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={onAddTindakan}
+                disabled={selectedTransaksi.items[0]?.kirim_ranap === 1}
+              >
+                <i className="fas fa-plus-circle me-1"></i> Tambah Tindakan
+              </Button>
+
               <Button
                 variant="success"
                 size="sm"
@@ -52,16 +62,11 @@ const RincianBilling = ({
                 <i className="fas fa-paper-plane me-1"></i> Kirim Ke SmartRemun
               </Button>
 
-              {/* Tombol hanya tampil jika data BUKAN berasal dari pendaftaran Rawat Inap */}
-              {!selectedTransaksi.header?.jenis_rawat?.includes(
-                "RAWAT INAP",
-              ) && (
+              {!selectedTransaksi.header?.jenis_rawat?.includes("RAWAT INAP") && (
                 <Button
                   variant="info"
                   size="sm"
                   onClick={onKirimRanap}
-                  /* Tombol tetap bisa disable jika sudah pernah diklik (kirim_ranap === 1) 
-       tapi status pendaftarannya masih IGD */
                   disabled={selectedTransaksi.items[0]?.kirim_ranap === 1}
                 >
                   <i className="fas fa-bed me-1"></i> Kirim Ke Rawat Inap
@@ -73,6 +78,7 @@ const RincianBilling = ({
               </Button>
             </div>
           </Card.Header>
+          
           <Card.Body>
             <div className="table-responsive">
               <Table
@@ -83,19 +89,18 @@ const RincianBilling = ({
                 <thead>
                   <tr>
                     <th>Tindakan / Item Obat</th>
-                    <th>Kelompok Tindakan</th>
+                    <th>Kelompok</th>
                     <th>Pelaksana/Dokter</th>
                     <th className="text-center">Qty</th>
                     <th className="text-end">Tarif Satuan</th>
                     <th className="text-end">Subtotal</th>
+                    <th className="text-center" style={{ width: "100px" }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedTransaksi.items.map((item, idx) => {
                     const hargaAsli = parseFloat(item.TotalTarif || 0);
                     const qty = parseFloat(item.Kuantitas || 1);
-
-                    // Logika pemisahan Obat vs Tindakan sesuai query SQL
                     const isObat = item.KelompokTindakan === "OBAT";
                     const subtotal = isObat ? hargaAsli : hargaAsli * qty;
                     const hargaSatuan = isObat ? hargaAsli / qty : hargaAsli;
@@ -104,11 +109,7 @@ const RincianBilling = ({
                       <tr key={idx}>
                         <td>
                           {item.NamaTindakan} <br />
-                          <Badge
-                            bg="soft-warning"
-                            className="mt-1"
-                            style={{ fontSize: "0.65rem" }}
-                          >
+                          <Badge bg="soft-warning" className="mt-1" style={{ fontSize: "0.65rem" }}>
                             Ruangan : {item.NamaRuangan}
                           </Badge>
                         </td>
@@ -116,16 +117,34 @@ const RincianBilling = ({
                         <td>
                           <strong>{getPelaksanaDefault(item)}</strong>
                           <br />
-                          {item.idRegister} - {item.NomorRekamMedis}
+                          <small className="text-muted">{item.idRegister}</small>
                         </td>
                         <td className="text-center">{item.Kuantitas}</td>
-                        <td className="text-end">
-                          {hargaSatuan.toLocaleString("id-ID")}
-                          <br />
-                          {item.TanggalPelayanan}
-                        </td>
-                        <td className="text-end fw-bold">
-                          {subtotal.toLocaleString("id-ID")}
+                        <td className="text-end">{hargaSatuan.toLocaleString("id-ID")}</td>
+                        <td className="text-end fw-bold">{subtotal.toLocaleString("id-ID")}</td>
+                        
+                        {/* KOLOM AKSI */}
+                        <td className="text-center">
+                          <div className="d-flex justify-content-center gap-1">
+                            <Button 
+                              variant="soft-warning" 
+                              size="xs" 
+                              className="btn-icon py-0 px-1"
+                              onClick={() => onEditTindakan(item)}
+                              disabled={selectedTransaksi.items[0]?.kirim_ranap === 1}
+                            >
+                              <i className="fas fa-edit" style={{fontSize: '0.8rem'}}></i>
+                            </Button>
+                            <Button 
+                              variant="soft-danger" 
+                              size="xs" 
+                              className="btn-icon py-0 px-1"
+                              onClick={() => onDeleteTindakan(item)}
+                              disabled={selectedTransaksi.items[0]?.kirim_ranap === 1}
+                            >
+                              <i className="fas fa-trash" style={{fontSize: '0.8rem'}}></i>
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -133,15 +152,11 @@ const RincianBilling = ({
                 </tbody>
                 <tfoot>
                   <tr className="table-primary">
-                    <td colSpan="5" className="text-end fw-bold">
-                      TOTAL PEMBAYARAN
-                    </td>
-                    <td
-                      className="text-end fw-bold"
-                      style={{ fontSize: "1.1rem" }}
-                    >
+                    <td colSpan="5" className="text-end fw-bold">TOTAL PEMBAYARAN</td>
+                    <td className="text-end fw-bold" style={{ fontSize: "1.1rem" }}>
                       Rp {calculateTotal().toLocaleString("id-ID")}
                     </td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </Table>

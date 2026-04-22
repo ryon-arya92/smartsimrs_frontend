@@ -266,24 +266,9 @@ const ListPasienTable = ({
                   }
                 />
               </Col>
-              <Col md="6" className="mb-3">
-                <Form.Label>Kelas Rawat</Form.Label>
-                <Form.Select
-                  value={formData?.KelasRawat || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, KelasRawat: e.target.value })
-                  }
-                >
-                  <option value="">Pilih Kelas</option>
-                  <option value="Kelas 1">Kelas 1</option>
-                  <option value="Kelas 2">Kelas 2</option>
-                  <option value="Kelas 3">Kelas 3</option>
-                  <option value="VIP">VIP</option>
-                </Form.Select>
-              </Col>
 
               {/* Tenaga Medis */}
-              <Col md="12" className="mb-3">
+              <Col md="6" className="mb-3">
                 <Form.Label>Nama Dokter (DPJP)</Form.Label>
                 <Form.Control
                   type="text"

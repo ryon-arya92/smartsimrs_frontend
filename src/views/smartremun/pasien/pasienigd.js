@@ -6,6 +6,8 @@ import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 import ListPasienTable from "../../../components/tabel/ListPasienTable";
 import RincianBilling from "../../../components/tabel/RincianBilling";
+import ModalEdit from "../../../components/modal/ModalEdit";
+import ModalTambah from "../../../components/modal/ModalTambah";
 
 const MySwal = withReactContent(Swal);
 
@@ -17,6 +19,14 @@ const PasienIgd = () => {
   const [theme, setTheme] = useState("light");
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({});
+  const [showModalAdd, setShowModalAdd] = useState(false);
+  const [showModalEdit, setShowModalEdit] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState(null);
+  const [listTarif, setListTarif] = useState([]); // Fetch ini dari API master_tarif
+  // --- STATE UNTUK MODAL TINDAKAN ---
+  const [showModalAddTindakan, setShowModalAddTindakan] = useState(false);
+  const [showModalEditTindakan, setShowModalEditTindakan] = useState(false);
+  const [itemTindakanToEdit, setItemTindakanToEdit] = useState(null);
 
   // 1. Fungsi Cari Pasien
   const handleSearch = async (e) => {
@@ -350,21 +360,130 @@ const PasienIgd = () => {
     setShowEditModal(true);
   };
 
-  // 9. Fungsi handle simpan (Update ke Laravel)
   const handleUpdate = async () => {
     try {
-      const response = await api.put(
-        `/igd/update-kunjungan/${formData.IdRegisterKunjungan}`,
-        formData,
+      // 1. Tampilkan Swal Loading
+      Swal.fire({
+        title: "Memproses...",
+        text: "Sedang memperbarui data kunjungan",
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      const { Total, NamaPasien, NomorRekamMedis, ...payload } = formData;
+
+      const response = await apismartremun.put(
+        `api/igd/update-kunjungan/${formData.IdRegisterKunjungan}`,
+        payload,
       );
-      if (response.status === 200) {
-        Swal.fire("Berhasil", "Data kunjungan diperbarui", "success");
-        handleSearch(); // Refresh tabel
-        setShowEditModal(false);
+
+      // 2. Perbaikan Logika: response.data.code (karena response dari Laravel ada di dalam .data)
+      if (response.data.code === 200 || response.data.status === "success") {
+        setShowEditModal(false); // Tutup modal dulu biar gak numpuk
+
+        await Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: response.data.message,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
+        handleSearch(); // Refresh tabel setelah swal hilang
       }
     } catch (err) {
-      Swal.fire("Error", "Gagal memperbarui data", "error");
+      console.error("Update Error:", err);
+      // Tutup loading dan tampilkan error
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text:
+          err.response?.data?.message ||
+          "Terjadi kesalahan saat memperbarui data",
+      });
     }
+  };
+
+  // --- 1. Fungsi Tambah Tindakan Baru ---
+  const handleSaveNewTindakan = async (newTindakan) => {
+    try {
+      Swal.fire({
+        title: "Menyimpan...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const payload = {
+        no_register: selectedTransaksi.header.IdRegisterKunjungan,
+        id_tarif: newTindakan.IdTarif, // Sesuaikan field ID tarif Anda
+        qty: newTindakan.Kuantitas,
+        // tambahkan field lain sesuai kebutuhan backend SIMRS
+      };
+
+      const res = await apismartremun.post("api/igd/tambah-tindakan", payload);
+
+      if (res.data.code === 200) {
+        await Swal.fire("Berhasil", "Tindakan berhasil ditambahkan", "success");
+        // Refresh detail agar tabel tindakan update
+        fetchDetailTransaksi(selectedTransaksi.header.IdRegisterKunjungan);
+        setShowModalAddTindakan(false);
+      }
+    } catch (err) {
+      Swal.fire("Error", "Gagal menambah tindakan", "error");
+    }
+  };
+
+  // --- 2. Fungsi Update Tindakan ---
+  const handleUpdateTindakan = async (updatedData) => {
+    try {
+      Swal.fire({
+        title: "Mengupdate...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const res = await apismartremun.put(
+        `api/igd/update-detail-tindakan/${updatedData.IdDetailTindakan}`,
+        updatedData,
+      );
+
+      if (res.data.code === 200) {
+        await Swal.fire("Berhasil", "Detail tindakan diperbarui", "success");
+        fetchDetailTransaksi(selectedTransaksi.header.IdRegisterKunjungan);
+        setShowModalEditTindakan(false);
+      }
+    } catch (err) {
+      Swal.fire("Error", "Gagal mengupdate tindakan", "error");
+    }
+  };
+
+  // --- 3. Fungsi Hapus Tindakan ---
+  const onDeleteTindakan = (item) => {
+    Swal.fire({
+      title: "Hapus Tindakan?",
+      text: `Anda akan menghapus ${item.NamaTindakan}`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await apismartremun.delete(
+            `api/igd/hapus-tindakan/${item.IdDetailTindakan}`,
+          );
+          if (res.data.code === 200) {
+            Swal.fire("Terhapus!", "Tindakan telah dihapus.", "success");
+            fetchDetailTransaksi(selectedTransaksi.header.IdRegisterKunjungan);
+          }
+        } catch (err) {
+          Swal.fire("Gagal", "Gagal menghapus data", "error");
+        }
+      }
+    });
   };
 
   return (
@@ -393,6 +512,7 @@ const PasienIgd = () => {
         />
 
         {/* Tambahkan props onKirimRanap di sini */}
+        {/* --- RINCIAN BILLING DENGAN PROPS ACTION --- */}
         <RincianBilling
           selectedTransaksi={selectedTransaksi}
           onClose={() => setSelectedTransaksi(null)}
@@ -400,6 +520,29 @@ const PasienIgd = () => {
           onKirimRanap={onKirimRanap}
           calculateTotal={calculateGrandTotal}
           getPelaksanaDefault={getPelaksanaDefault}
+          // Tambahkan handler baru di sini:
+          onAddTindakan={() => setShowModalAddTindakan(true)}
+          onEditTindakan={(item) => {
+            setItemTindakanToEdit(item);
+            setShowModalEditTindakan(true);
+          }}
+          onDeleteTindakan={onDeleteTindakan}
+        />
+
+        {/* --- MODAL TAMBAH TINDAKAN --- */}
+        <ModalTambah
+          show={showModalAddTindakan}
+          onHide={() => setShowModalAddTindakan(false)}
+          onSave={handleSaveNewTindakan}
+          listTarif={listTarif} // Pastikan sudah fetch data master tarif sebelumnya
+        />
+
+        {/* --- MODAL EDIT TINDAKAN --- */}
+        <ModalEdit
+          show={showModalEditTindakan}
+          onHide={() => setShowModalEditTindakan(false)}
+          onUpdate={handleUpdateTindakan}
+          dataEdit={itemTindakanToEdit}
         />
       </Col>
     </Row>
