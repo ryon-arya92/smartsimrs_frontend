@@ -126,7 +126,7 @@ const RincianBilling = ({
                         {/* KOLOM AKSI */}
                         <td className="text-center">
                           <div className="d-flex justify-content-center gap-1">
-                            <Button 
+                            {/* <Button 
                               variant="soft-warning" 
                               size="xs" 
                               className="btn-icon py-0 px-1"
@@ -134,7 +134,7 @@ const RincianBilling = ({
                               disabled={selectedTransaksi.items[0]?.kirim_ranap === 1}
                             >
                               <i className="fas fa-edit" style={{fontSize: '0.8rem'}}></i>
-                            </Button>
+                            </Button> */}
                             <Button 
                               variant="soft-danger" 
                               size="xs" 

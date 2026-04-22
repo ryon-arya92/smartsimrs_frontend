@@ -75,6 +75,7 @@ const Transaksi = () => {
             kodeTindakan: item.IdTindakan,
             namaTindakan: item.NamaTindakan,
             KelompokTindakan: item.KelompokTindakan,
+            NamaPelaksanaMedis: item.NamaPelaksanaMedis,
             Qty: qty,
             Harga: tarif.toLocaleString("id-ID", {
               style: "currency",
@@ -133,7 +134,8 @@ const Transaksi = () => {
     { name: "No", selector: (row) => row.no, width: "60px" },
     { name: "Id Pelayanan", selector: (row) => row.IdPelayananMedis },
     { name: "Kode Tindakan", selector: (row) => row.kodeTindakan },
-    { name: "Tindakan", selector: (row) => row.namaTindakan, width: "450px" },
+    { name: "Tindakan", selector: (row) => row.namaTindakan },
+    { name: "Dokter", selector: (row) => row.NamaPelaksanaMedis },
     { name: "Kelompok", selector: (row) => row.KelompokTindakan },
     { name: "Qty", selector: (row) => row.Qty, width: "90px" },
     { name: "Tarif", selector: (row) => row.Harga, right: true },

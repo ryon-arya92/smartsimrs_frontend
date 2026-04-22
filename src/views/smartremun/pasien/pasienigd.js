@@ -93,6 +93,16 @@ const PasienIgd = () => {
   const handleKirimSmartRemun = async () => {
     if (!selectedTransaksi) return;
 
+    // --- CARI DATA TERBARU DARI STATE LOKAL ---
+    const dataPasienTerupdate = listRegister.find(
+      (item) => item.IdRegisterKunjungan === selectedTransaksi.id,
+    );
+
+    // Gunakan total dari listRegister jika ada, fallback ke header jika tidak ditemukan
+    const totalTerupdate = dataPasienTerupdate
+      ? dataPasienTerupdate.Total
+      : selectedTransaksi.header.Total;
+
     const result = await MySwal.fire({
       title: "Konfirmasi Kirim",
       text: `Kirim data ${selectedTransaksi.nama} ke SmartRemun?`,
@@ -124,7 +134,7 @@ const PasienIgd = () => {
             NamaPasien: selectedTransaksi.header.NamaPasien,
             NomorSEP: selectedTransaksi.header.NomorSEP,
             Ruangan: "IGD/UGD",
-            Total: selectedTransaksi.header.Total,
+            Total: totalTerupdate,
             NamaDokter: selectedTransaksi.header.NamaDokter,
           },
           items: selectedTransaksi.items.map((item) => {
@@ -182,11 +192,21 @@ const PasienIgd = () => {
           text: "Data berhasil disinkronkan ke SmartRemun.",
         });
       } catch (err) {
-        console.error(err);
-        MySwal.fire({
+        // Ambil data dari response error
+        const resData = err.response?.data;
+
+        // Ambil pesan dari detail -> metadata -> message
+        // Gunakan optional chaining (?.) agar tidak crash jika salah satu level null
+        const errorMessage =
+          resData?.detail?.metadata?.message ||
+          resData?.message ||
+          "Terjadi kesalahan pada server SmartRemun";
+
+        Swal.fire({
           icon: "error",
-          title: "Gagal Sinkronisasi",
-          text: err.response?.data?.message || "Terjadi kesalahan pada server.",
+          title: "Sinkronisasi Gagal",
+          text: errorMessage, // Akan tampil: "Duplicate entry '31877' for key 'IDR'"
+          confirmButtonColor: "#3085d6",
         });
       }
     }
@@ -342,14 +362,18 @@ const PasienIgd = () => {
 
   // 7. Fungsi untuk mendapatkan nama pelaksana default jika data tidak tersedia (untuk ditampilkan di RincianBilling)
   const getPelaksanaDefault = (item) => {
-    if (item.NamaPelaksanaMedis) return item.NamaPelaksanaMedis;
-
+    // 1. Prioritaskan Case Khusus berdasarkan KelompokTindakan
     switch (item.KelompokTindakan) {
       case "LABORATORIUM":
         return "dr. Yohana Muliadi, Sp. PK";
       case "RADIOLOGI":
         return "dr. Praharsa Akmaja Chaetajaka, Sp. Rad";
+
+      // 2. Jika bukan Lab/Radiologi, baru cek apakah sudah ada nama pelaksana dari DB
       default:
+        if (item.NamaPelaksanaMedis && item.NamaPelaksanaMedis !== "-") {
+          return item.NamaPelaksanaMedis;
+        }
         return "-";
     }
   };
@@ -407,8 +431,8 @@ const PasienIgd = () => {
     }
   };
 
-  // --- 1. Fungsi Tambah Tindakan Baru ---
-  const handleSaveNewTindakan = async (newTindakan) => {
+  // --- 9. Fungsi Tambah Tindakan Baru ---
+  const handleSaveNewTindakan = async (tarifDipilih) => {
     try {
       Swal.fire({
         title: "Menyimpan...",
@@ -416,27 +440,77 @@ const PasienIgd = () => {
         didOpen: () => Swal.showLoading(),
       });
 
+      const header = selectedTransaksi.header;
+      const total_tambahan =
+        parseFloat(tarifDipilih.TotalTarif) * parseInt(tarifDipilih.Kuantitas);
+
       const payload = {
-        no_register: selectedTransaksi.header.IdRegisterKunjungan,
-        id_tarif: newTindakan.IdTarif, // Sesuaikan field ID tarif Anda
-        qty: newTindakan.Kuantitas,
-        // tambahkan field lain sesuai kebutuhan backend SIMRS
+        no_register: selectedTransaksi.id,
+        tgl_masuk:
+          header.TanggalMasuk || header.TanggalPendaftaran || header.TglMasuk,
+        jenis_rawat: header.JenisRawat || "RAWAT DARURAT",
+        nama_poli:
+          selectedTransaksi.header.Ruangan ||
+          selectedTransaksi.header.Poliklinik,
+        tipe: tarifDipilih.Tipe,
+        id_item: tarifDipilih.id_setup_tarif,
+        nama_item: tarifDipilih.NamaTindakan,
+        qty: tarifDipilih.Kuantitas,
+        harga_satuan: tarifDipilih.TotalTarif,
+        dokter: tarifDipilih.NamaDokter,
       };
 
-      const res = await apismartremun.post("api/igd/tambah-tindakan", payload);
+      const response = await apismartremun.post(
+        "api/igd/tambah-tindakan",
+        payload,
+      );
 
-      if (res.data.code === 200) {
-        await Swal.fire("Berhasil", "Tindakan berhasil ditambahkan", "success");
-        // Refresh detail agar tabel tindakan update
-        fetchDetailTransaksi(selectedTransaksi.header.IdRegisterKunjungan);
+      if (response.data.code === 200 || response.data.status === "success") {
+        // --- UPDATE STATE LOKAL: Agar Total Billing di tabel depan langsung berubah ---
+        setListRegister((prevList) =>
+          prevList.map((item) => {
+            if (item.IdRegisterKunjungan === selectedTransaksi.id) {
+              const nilaiLama = parseFloat(item.Total);
+              const totalLamaTervalidasi = isNaN(nilaiLama) ? 0 : nilaiLama;
+              const tambahan = parseFloat(total_tambahan) || 0;
+              return {
+                ...item,
+                Total: totalLamaTervalidasi + tambahan,
+              };
+            }
+            return item;
+          }),
+        );
+
+        await Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: response.data.message,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
         setShowModalAddTindakan(false);
+
+        // Tetap panggil fetch rincian untuk sinkronisasi data detail
+        fetchDetailTransaksi(
+          selectedTransaksi.id,
+          selectedTransaksi.rm,
+          selectedTransaksi.nama,
+          selectedTransaksi.header,
+        );
       }
     } catch (err) {
-      Swal.fire("Error", "Gagal menambah tindakan", "error");
+      console.error("Save Error:", err);
+      Swal.fire(
+        "Gagal",
+        err.response?.data?.message || "Terjadi kesalahan",
+        "error",
+      );
     }
   };
 
-  // --- 2. Fungsi Update Tindakan ---
+  // --- 10. Fungsi Update Tindakan ---
   const handleUpdateTindakan = async (updatedData) => {
     try {
       Swal.fire({
@@ -460,27 +534,70 @@ const PasienIgd = () => {
     }
   };
 
-  // --- 3. Fungsi Hapus Tindakan ---
+  // --- 11. Fungsi Hapus Tindakan ---
   const onDeleteTindakan = (item) => {
     Swal.fire({
-      title: "Hapus Tindakan?",
-      text: `Anda akan menghapus ${item.NamaTindakan}`,
+      title: "Hapus Item?",
+      text: `Yakin ingin menghapus ${item.NamaTindakan}?`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonText: "Ya, Hapus!",
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Ya, Hapus",
       cancelButtonText: "Batal",
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await apismartremun.delete(
-            `api/igd/hapus-tindakan/${item.IdDetailTindakan}`,
+          // 1. Tampilkan Swal Loading
+          Swal.fire({
+            title: "Memproses...",
+            text: "Sedang menghapus data transaksi",
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          // 2. Eksekusi ke Backend
+          // Langsung kirim idTindakan dan kelompok (Tindakan/Obat)
+          const response = await apismartremun.post(
+            `api/igd/hapus-tindakan/${item.idTindakan}`,
+            {
+              kelompok: item.KelompokTindakan,
+            },
           );
-          if (res.data.code === 200) {
-            Swal.fire("Terhapus!", "Tindakan telah dihapus.", "success");
-            fetchDetailTransaksi(selectedTransaksi.header.IdRegisterKunjungan);
+
+          // 3. Cek Response
+          if (
+            response.data.code === 200 ||
+            response.data.status === "success"
+          ) {
+            await Swal.fire({
+              icon: "success",
+              title: "Berhasil",
+              text: response.data.message || "Data berhasil dihapus",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+
+            // 4. Refresh Detail Transaksi agar tabel terupdate secara otomatis
+            fetchDetailTransaksi(
+              selectedTransaksi.id, // idRegister
+              selectedTransaksi.rm, // NomorRekamMedis
+              selectedTransaksi.nama, // NamaPasien
+              selectedTransaksi.header, // dataHeader
+            );
           }
         } catch (err) {
-          Swal.fire("Gagal", "Gagal menghapus data", "error");
+          console.error("Delete Error:", err);
+          Swal.fire({
+            icon: "error",
+            title: "Gagal",
+            text:
+              err.response?.data?.message ||
+              "Terjadi kesalahan saat menghapus data",
+          });
         }
       }
     });
@@ -527,6 +644,7 @@ const PasienIgd = () => {
             setShowModalEditTindakan(true);
           }}
           onDeleteTindakan={onDeleteTindakan}
+          api={apismartremun} // Kirim instance API untuk digunakan di RincianBilling jika diperlukan
         />
 
         {/* --- MODAL TAMBAH TINDAKAN --- */}

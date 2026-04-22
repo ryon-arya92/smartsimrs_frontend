@@ -33,7 +33,9 @@ const PasienRanap = () => {
     setLoading(true);
     setSelectedTransaksi(null);
     try {
-      const response = await api.get(`/igd/registerranap`, { params: { search } });
+      const response = await api.get(`/igd/registerranap`, {
+        params: { search },
+      });
       setListRegister(response.data.data);
 
       if (response.data.data.length === 0) {
@@ -81,6 +83,16 @@ const PasienRanap = () => {
   const handleKirimSmartRemun = async () => {
     if (!selectedTransaksi) return;
 
+    // --- CARI DATA TERBARU DARI STATE LOKAL ---
+    const dataPasienTerupdate = listRegister.find(
+      (item) => item.IdRegisterKunjungan === selectedTransaksi.id,
+    );
+
+    // Gunakan total dari listRegister jika ada, fallback ke header jika tidak ditemukan
+    const totalTerupdate = dataPasienTerupdate
+      ? dataPasienTerupdate.Total
+      : selectedTransaksi.header.Total;
+
     const result = await MySwal.fire({
       title: "Konfirmasi Kirim",
       text: `Kirim data ${selectedTransaksi.nama} ke SmartRemun?`,
@@ -111,8 +123,10 @@ const PasienRanap = () => {
             NamaAsuransi: selectedTransaksi.header.NamaAsuransi,
             NamaPasien: selectedTransaksi.header.NamaPasien,
             NomorSEP: selectedTransaksi.header.NomorSEP,
-            Ruangan: selectedTransaksi.header.Ruangan,
-            Total: selectedTransaksi.header.Total,
+            Ruangan:
+              selectedTransaksi.header.Ruangan ||
+              selectedTransaksi.header.Poliklinik,
+            Total: totalTerupdate,
             NamaDokter: selectedTransaksi.header.NamaDokter,
           },
           items: selectedTransaksi.items.map((item) => {
@@ -123,7 +137,7 @@ const PasienRanap = () => {
                 : item.TotalTarif;
 
             return {
-              IdRegisterKunjungan: selectedTransaksi.header.IdRegister,
+              IdRegisterKunjungan: selectedTransaksi.header.IdRegisterKunjungan,
               IdRegister: selectedTransaksi.header.IdRegisterKunjungan,
               IdPelayananMedis: item.idPelayananMedis,
               IdTindakan: item.idTindakan,
@@ -170,11 +184,21 @@ const PasienRanap = () => {
           text: "Data berhasil disinkronkan ke SmartRemun.",
         });
       } catch (err) {
-        console.error(err);
-        MySwal.fire({
+        // Ambil data dari response error
+        const resData = err.response?.data;
+
+        // Ambil pesan dari detail -> metadata -> message
+        // Gunakan optional chaining (?.) agar tidak crash jika salah satu level null
+        const errorMessage =
+          resData?.detail?.metadata?.message ||
+          resData?.message ||
+          "Terjadi kesalahan pada server SmartRemun";
+
+        Swal.fire({
           icon: "error",
-          title: "Gagal Sinkronisasi",
-          text: err.response?.data?.message || "Terjadi kesalahan pada server.",
+          title: "Sinkronisasi Gagal",
+          text: errorMessage, // Akan tampil: "Duplicate entry '31877' for key 'IDR'"
+          confirmButtonColor: "#3085d6",
         });
       }
     }
@@ -330,14 +354,18 @@ const PasienRanap = () => {
 
   // 7. Fungsi untuk mendapatkan nama pelaksana default jika data tidak tersedia (untuk ditampilkan di RincianBilling)
   const getPelaksanaDefault = (item) => {
-    if (item.NamaPelaksanaMedis) return item.NamaPelaksanaMedis;
-
+    // 1. Prioritaskan Case Khusus berdasarkan KelompokTindakan
     switch (item.KelompokTindakan) {
       case "LABORATORIUM":
         return "dr. Yohana Muliadi, Sp. PK";
       case "RADIOLOGI":
         return "dr. Praharsa Akmaja Chaetajaka, Sp. Rad";
+
+      // 2. Jika bukan Lab/Radiologi, baru cek apakah sudah ada nama pelaksana dari DB
       default:
+        if (item.NamaPelaksanaMedis && item.NamaPelaksanaMedis !== "-") {
+          return item.NamaPelaksanaMedis;
+        }
         return "-";
     }
   };
