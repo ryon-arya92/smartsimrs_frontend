@@ -127,10 +127,10 @@ const Rajal = () => {
 };
 
 
-  const filteredData = data.filter(
+   const filteredData = data.filter(
     (item) =>
       item.namaPasien?.toLowerCase().includes(filterText.toLowerCase()) ||
-      item.noRekamMedis?.toLowerCase().includes(filterText.toLowerCase())
+      item.noRekamMedis?.toLowerCase().includes(filterText.toLowerCase()) || item.nomorSEP?.toLowerCase().includes(filterText.toLowerCase())
   );
 
   const columns = [
@@ -138,7 +138,7 @@ const Rajal = () => {
     { name: "Id Register", selector: (row) => row.idRegister, sortable: true },
     { name: "No RM", selector: (row) => row.noRekamMedis },
     { name: "Nama Pasien", selector: (row) => row.namaPasien },
-    { name: "Nomor SEP", selector: (row) => row.nomorSEP },
+    { name: "Nomor SEP", selector: (row) => row.nomorSEP, width: "200px" },
     { name: "Nama Dokter", selector: (row) => row.namaDokter },
     { name: "Asuransi", selector: (row) => row.namaAsuransi },
     { name: "Poli", selector: (row) => row.poli },
@@ -170,7 +170,7 @@ const Rajal = () => {
         >
           <Card.Header className="d-flex justify-content-between">
             <div className="header-title">
-              <h4 className="card-title">Data Register IGD</h4>
+              <h4 className="card-title">Data Register Rawat Jalan</h4>
             </div>
             <div className="d-flex">
               <Form.Control

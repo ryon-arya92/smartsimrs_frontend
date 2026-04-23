@@ -19,21 +19,24 @@ const ListPasienTable = ({
     <Row>
       <Col sm="12">
         <Card className="border-primary">
-          <Card.Header className="d-flex justify-content-between align-items-center bg-transparent">
+          <Card.Header className="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-transparent gap-3 py-3">
+            {/* Bagian Kiri: Title */}
             <div className="header-title">
-              <h4 className="card-title">{title}</h4>
+              <h4 className="card-title mb-0">{title}</h4>
             </div>
+
             <Form
               onSubmit={onSearch}
-              className="d-flex align-items-center gap-2 mt-2 mt-md-0"
+              className="d-flex align-items-center gap-2 w-md-auto"
             >
               <Form.Control
                 type="text"
-                placeholder="Cari No Reg / No. RM / Nama Pasien"
+                placeholder="Cari No Reg / RM / Nama Pasien"
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ width: "330px" }}
+                // Ganti width fixed menjadi kelas responsif
+                className="flex-grow-1 flex-md-grow-0"
               />
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" className="px-4">
                 Cari
               </Button>
             </Form>
