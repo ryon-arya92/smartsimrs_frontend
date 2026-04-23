@@ -535,72 +535,97 @@ const PasienIgd = () => {
   };
 
   // --- 11. Fungsi Hapus Tindakan ---
-  const onDeleteTindakan = (item) => {
-    Swal.fire({
+  const onDeleteTindakan = async (item) => {
+    // 1. Konfirmasi Hapus
+    const result = await Swal.fire({
       title: "Hapus Item?",
-      text: `Yakin ingin menghapus ${item.NamaTindakan}?`,
+      text: `Yakin ingin menghapus ${item.namaTindakan || item.NamaTindakan}?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#6c757d",
       confirmButtonText: "Ya, Hapus",
       cancelButtonText: "Batal",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          // 1. Tampilkan Swal Loading
-          Swal.fire({
-            title: "Memproses...",
-            text: "Sedang menghapus data transaksi",
-            allowOutsideClick: false,
-            showConfirmButton: false,
-            didOpen: () => {
-              Swal.showLoading();
-            },
-          });
+    });
 
-          // 2. Eksekusi ke Backend
-          // Langsung kirim idTindakan dan kelompok (Tindakan/Obat)
-          const response = await apismartremun.post(
-            `api/igd/hapus-tindakan/${item.idTindakan}`,
-            {
-              kelompok: item.KelompokTindakan,
-            },
+    if (result.isConfirmed) {
+      try {
+        // 2. Tampilkan Swal Loading
+        Swal.fire({
+          title: "Memproses...",
+          text: "Sedang menghapus data transaksi",
+          allowOutsideClick: false,
+          showConfirmButton: false,
+          didOpen: () => Swal.showLoading(),
+        });
+
+        // Hitung nominal yang akan dikurangi (Gunakan properti dari 'item')
+        // Pastikan nama property sesuai (Qty/Kuantitas dan Harga/TotalTarif)
+        const nominalDikurangi =
+          parseFloat(item.TotalTarif || item.Harga || 0) *
+          parseFloat(item.Kuantitas || item.Qty || 1);
+
+        // 3. Eksekusi ke Backend
+        // Menggunakan idTindakan (atau kodeTindakan sesuai mapping Anda)
+        const response = await apismartremun.post(
+          `api/igd/hapus-tindakan/${item.idTindakan || item.kodeTindakan}`,
+          {
+            kelompok: item.KelompokTindakan,
+          },
+        );
+
+        // 4. Cek Response
+        if (response.data.code === 200 || response.data.status === "success") {
+          // --- UPDATE STATE LOKAL (PENGURANGAN TOTAL) ---
+          setListRegister((prevList) =>
+            prevList.map((reg) => {
+              if (reg.IdRegisterKunjungan === selectedTransaksi.id) {
+                const nilaiLama = parseFloat(reg.Total || 0);
+                return {
+                  ...reg,
+                  Total: nilaiLama - nominalDikurangi, // Dikurangi, bukan ditambah
+                };
+              }
+              return reg;
+            }),
           );
 
-          // 3. Cek Response
-          if (
-            response.data.code === 200 ||
-            response.data.status === "success"
-          ) {
-            await Swal.fire({
-              icon: "success",
-              title: "Berhasil",
-              text: response.data.message || "Data berhasil dihapus",
-              timer: 1500,
-              showConfirmButton: false,
-            });
+          // Update juga header di selectedTransaksi agar sinkron saat kirim SmartRemun
+          setSelectedTransaksi((prev) => ({
+            ...prev,
+            header: {
+              ...prev.header,
+              Total: parseFloat(prev.header.Total || 0) - nominalDikurangi,
+            },
+          }));
 
-            // 4. Refresh Detail Transaksi agar tabel terupdate secara otomatis
-            fetchDetailTransaksi(
-              selectedTransaksi.id, // idRegister
-              selectedTransaksi.rm, // NomorRekamMedis
-              selectedTransaksi.nama, // NamaPasien
-              selectedTransaksi.header, // dataHeader
-            );
-          }
-        } catch (err) {
-          console.error("Delete Error:", err);
-          Swal.fire({
-            icon: "error",
-            title: "Gagal",
-            text:
-              err.response?.data?.message ||
-              "Terjadi kesalahan saat menghapus data",
+          await Swal.fire({
+            icon: "success",
+            title: "Berhasil",
+            text: response.data.message || "Data berhasil dihapus",
+            timer: 1500,
+            showConfirmButton: false,
           });
+
+          // 5. Refresh Detail Transaksi
+          fetchDetailTransaksi(
+            selectedTransaksi.id,
+            selectedTransaksi.rm,
+            selectedTransaksi.nama,
+            selectedTransaksi.header,
+          );
         }
+      } catch (err) {
+        console.error("Delete Error:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text:
+            err.response?.data?.message ||
+            "Terjadi kesalahan saat menghapus data",
+        });
       }
-    });
+    }
   };
 
   return (
