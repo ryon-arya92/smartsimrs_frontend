@@ -253,7 +253,7 @@ const PasienIgd = () => {
         const inputOptions = {};
         listRanap.forEach((item) => {
           inputOptions[item.IdRegisterKunjungan] =
-            `${item.IdRegisterKunjungan} - ${item.Ruangan} (${item.TanggalMasuk})`;
+            `${item.NomorRekamMedis} - ${item.NamaPasien} (${item.TanggalMasuk})`;
         });
 
         // 2. Tampilkan Swal dengan input select
